@@ -1,41 +1,49 @@
 groups:
   - name: demo-service-alerts
     rules:
-      - alert: container_cpu_usage_high
-        expr: >
-          sum by (path, instance, job)
-          (rate(container_cpu_user_seconds_total{}[1m])) / sum by (path,
-          instance, job) (rate(container_cpu_user_seconds_total{}[1m])) * 100 >
-          0.5
-        for: 30s
+      # CPU: % of one CPU core per container averaged over 5m
+      - alert: ContainerCPUUsageHigh
+        expr: |
+          sum by (instance, job, container) (
+            rate(container_cpu_user_seconds_total{container!="",image!=""}[5m])
+          ) * 100 > 80
+        for: 2m
         labels:
           severity: critical
         annotations:
-          description: The 5xx error rate for path {{$labels.path}} on
-            {{$labels.instance}} is {{$value}}%.
-      - alert: container_memory_usage_high
-        expr: >
-          sum by (path, instance, job) (rate(container_memory_usage_bytes{}[1m])) /
-          sum by (path, instance, job)
-          (rate(container_memory_total_inactive_file_bytes{}[1m])) * 0.05 > 1500
-        for: 30s
+          summary: "High container CPU usage"
+          description: "Container {{ $labels.container }} on {{ $labels.instance }} is using {{ printf \"%.2f\" $value }}% CPU (5m avg)."
+
+      # Memory: usage vs container memory limit (%)
+      - alert: ContainerMemoryUsageHigh
+        expr: |
+          (container_memory_usage_bytes{container!=""} / container_spec_memory_limit_bytes{container!=""}) * 100 > 90
+        for: 2m
         labels:
           severity: critical
         annotations:
-          description: The 5xx error rate for path {{$labels.path}} on
-            {{$labels.instance}} is {{$value}}%.
+          summary: "High container memory usage"
+          description: "Container {{ $labels.container }} on {{ $labels.instance }} is using {{ printf \"%.2f\" $value }}% of its memory limit."
+
+      # Errors: simple spike in error counter
       - alert: HighErrorRate
         expr: increase(demo_errors_total[1m]) > 5
         for: 1m
         labels:
           severity: warning
         annotations:
-          summary: High error rate detected in demo app
+          summary: "High error count in demo app"
+          description: "demo_errors_total increased by {{ printf \"%.0f\" $value }} in the last minute on {{ $labels.instance }}."
+
+      # Latency: P95 > 1s using histogram buckets
       - alert: HighLatency
-        expr: histogram_quantile(0.95,
-          sum(rate(demo_request_latency_seconds_bucket[1m])) by (le)) > 1
-        for: 1m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, job, path) (rate(demo_request_latency_seconds_bucket[5m]))
+          ) > 1
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: High request latency detected in demo app
+          summary: "High request latency (P95)"
+          description: "P95 latency for path {{ $labels.path }} on {{ $labels.instance }} is {{ printf \"%.2f\" $value }}s (5m)."
