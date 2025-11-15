@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, request
 from prometheus_client import Counter, Histogram, generate_latest
 
@@ -9,21 +8,21 @@ ERROR_COUNT = Counter('demo_errors_total', 'Total errors')
 REQUEST_LATENCY = Histogram('demo_request_latency_seconds', 'Request latency')
 
 @app.route('/')
-@REQUEST_LATENCY.time()
 def index():
     REQUEST_COUNT.labels(request.method, '/').inc()
-    return "Hello, World!"
+    with REQUEST_LATENCY.time():
+        return "Hello, World!"
 
 @app.route('/fail')
-@REQUEST_LATENCY.time()
 def fail():
     REQUEST_COUNT.labels(request.method, '/fail').inc()
-    ERROR_COUNT.inc()
-    return "Error!", 500
+    with REQUEST_LATENCY.time():
+        ERROR_COUNT.inc()
+        return "Error!", 500
 
 @app.route('/metrics')
 def metrics():
-    return generate_latest(), 200, {'Content-Type': 'text/plain'}
+    return generate_latest(), 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8081)

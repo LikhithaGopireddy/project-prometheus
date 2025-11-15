@@ -1,44 +1,25 @@
-# my global config
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-# Alertmanager configuration
 alerting:
   alertmanagers:
     - static_configs:
-        - targets:
-          #- alertmanager:9093   # Uncomment and set as needed
+        - targets: ['alertmanager:9093']
 
 rule_files:
-  - alerting_rules.yml
-  - recording_rules.yml
+  - /etc/prometheus/alerting_rules.yml
+  - /etc/prometheus/recording_rules.yml
 
 scrape_configs:
-  - job_name: "prometheus"
+  - job_name: 'prometheus'
     static_configs:
-      - targets: ["localhost:9090"]
+      - targets: ['localhost:9090']
 
-  - job_name: "demo"
+  - job_name: 'demo'
     static_configs:
-      - targets: ['d1:8081', 'd2:8080', 'd3:8080']
-    metric_relabel_configs:
-      - action: keep
-        source_labels: [__name__]
-        regex: '(demo_|http_).*'
+      - targets: ['demo-service:8081']
 
-  - job_name: "node"
-    static_configs:
-      - targets: ['$(hostname -i):9100']
-
-  - job_name: "cadvisor"
-    static_configs:
-      - targets: ['cadvisor:8080']
-
-  - job_name: "cpu-exporter"
+  - job_name: 'cpu-exporter'
     static_configs:
       - targets: ['cpu-exporter:8000']
-
-  - job_name: 'instrumentation-example'
-    static_configs:
-      - targets: ['lab-app:12345']

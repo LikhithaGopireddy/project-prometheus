@@ -1,31 +1,6 @@
 groups:
   - name: demo-service-alerts
     rules:
-      # CPU: % of one CPU core per container averaged over 5m
-      - alert: ContainerCPUUsageHigh
-        expr: |
-          sum by (instance, job, container) (
-            rate(container_cpu_user_seconds_total{container!="",image!=""}[5m])
-          ) * 100 > 80
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "High container CPU usage"
-          description: "Container {{ $labels.container }} on {{ $labels.instance }} is using {{ printf \"%.2f\" $value }}% CPU (5m avg)."
-
-      # Memory: usage vs container memory limit (%)
-      - alert: ContainerMemoryUsageHigh
-        expr: |
-          (container_memory_usage_bytes{container!=""} / container_spec_memory_limit_bytes{container!=""}) * 100 > 90
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "High container memory usage"
-          description: "Container {{ $labels.container }} on {{ $labels.instance }} is using {{ printf \"%.2f\" $value }}% of its memory limit."
-
-      # Errors: simple spike in error counter
       - alert: HighErrorRate
         expr: increase(demo_errors_total[1m]) > 5
         for: 1m
@@ -33,17 +8,51 @@ groups:
           severity: warning
         annotations:
           summary: "High error count in demo app"
-          description: "demo_errors_total increased by {{ printf \"%.0f\" $value }} in the last minute on {{ $labels.instance }}."
+          description: "demo_errors_total increased by {{ printf \"%.0f\" $value }} in the last minute (instance={{ $labels.instance }})."
 
-      # Latency: P95 > 1s using histogram buckets
-      - alert: HighLatency
+      - alert: HighLatencyP95
         expr: |
           histogram_quantile(0.95,
-            sum by (le, job, path) (rate(demo_request_latency_seconds_bucket[5m]))
-          ) > 1
-        for: 5m
+            sum by (le, job) (rate(demo_request_latency_seconds_bucket[1m]))
+          ) > 0.1
+        for: 30s
         labels:
           severity: warning
         annotations:
           summary: "High request latency (P95)"
-          description: "P95 latency for path {{ $labels.path }} on {{ $labels.instance }} is {{ printf \"%.2f\" $value }}s (5m)."
+          description: "P95 latency (P95) is {{ printf \"%.2f\" $value }}s over 1m (job={{ $labels.job }})."
+
+      # ✅ This is your temporary test alert
+      - alert: AlwaysFiresTest
+        expr: vector(1)
+        for: 30s
+        labels:
+          severity: info
+        annotations:
+          summary: "Test alert"
+          description: "This alert always fires — used to confirm alerting setup works."
+
+
+
+
+  - name: cpu-exporter-alerts
+    rules:
+      # CPU usage > 80% for 2m (1 - idle%)
+      - alert: HighCPUUsage
+        expr: 100 * (1 - rate(cpu_exporter_cpu_usage_seconds_total{mode="idle"}[5m])) > 80
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage on {{ $labels.instance }} is above 80% (currently {{ printf \"%.2f\" $value }}%)."
+
+      # Optional: alert if any target is down for 1 minute
+      - alert: TargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Target down"
+          description: "The target {{ $labels.job }} ({{ $labels.instance }}) has been down for over 1 minute."
