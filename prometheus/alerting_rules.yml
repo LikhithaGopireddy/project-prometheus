@@ -39,8 +39,8 @@ groups:
     rules:
       # CPU usage > 80% for 2m (1 - idle%)
       - alert: HighCPUUsage
-        expr: 100 * (1 - rate(cpu_exporter_cpu_usage_seconds_total{mode="idle"}[5m])) > 80
-        for: 2m
+        expr: 100 * (1 - rate(cpu_exporter_cpu_usage_seconds_total{mode="idle"}[5m])) > 5
+        for: 1m
         labels:
           severity: critical
         annotations:
